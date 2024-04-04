@@ -5,7 +5,7 @@ from collections import defaultdict
 import numpy as np
 
 from eval import DetectionEvaluator
-from util.constants import *
+from util import *
 
 
 def evaluate_meta(meta, basin, config):

@@ -1,6 +1,6 @@
 from pathlib import Path 
 
-IMAGE_SIZE=512
+IMG_SIZE = 512
 RESULTS_DIR = Path("data/training/results/")
 DEPLOYMENT_DIR = Path("data/deployment/")
 

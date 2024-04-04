@@ -1,7 +1,7 @@
 from pathlib import Path 
 import geopandas as gpd 
 
-from util.constants import *
+from util import *
 
 def evaluate(deploy_gdf,
              reported_gdf,
@@ -30,16 +30,16 @@ def evaluate(deploy_gdf,
 def evaluate_all():
     
     for basin in ['permian', 'denver']:
-        deploy_gdf = gpd.read_file(
+        deploy_gdf = csv2gdf(
             DEPLOYMENT_DIR / 
             'well-pad' / 
-            f'{basin}_well_pads.geojson'
+            f'{basin}_well_pads.csv'
         )         
-        reported_gdf = gpd.read_file(
+        reported_gdf = csv2gdf(
             DEPLOYMENT_DIR / 
             'well-pad' / 
             'reported' / 
-            f'{basin}_hifld.geojson'
+            f'{basin}_hifld.csv'
         )
         print(basin.capitalize())
         print("*"*50)
