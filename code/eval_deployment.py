@@ -28,7 +28,7 @@ def evaluate(deploy_gdf,
     }
 
 def evaluate_all():
-    
+    print("Well Pad detections assessed against HIFLD dataset (Fig. 2)") 
     for basin in ['permian', 'denver']:
         deploy_gdf = csv2gdf(
             DEPLOYMENT_DIR / 
@@ -45,8 +45,8 @@ def evaluate_all():
         print("*"*50)
         print(f"# Well Pad Detections: {deploy_gdf.shape[0]}")
         print("*"*50)
-        for active_only, descr in [(True, "Active Reported Well Pads (HIFLD)"), 
-                                   (False, "All Reported Well Pads (HIFLD)")]:
+        for active_only, descr in [(True, "Active Reported Well Pads"), 
+                                   (False, "All Reported Well Pads")]:
             print(descr)
             metrics = evaluate(deploy_gdf, reported_gdf, active_only)
             for k, v in metrics.items():
