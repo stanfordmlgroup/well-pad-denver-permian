@@ -3,6 +3,7 @@ from detectron2.structures import Instances, Boxes
 import torch
 from collections import defaultdict
 import numpy as np
+from tabulate import tabulate
 
 from eval import DetectionEvaluator
 from util import *
@@ -49,12 +50,12 @@ def evaluate_meta(meta, basin, config):
     metrics = detection_evaluator.evaluate()
     return metrics
 
-def evaluate_storage_tanks(basin):
+def evaluate_storage_tank_basin(basin):
     meta = pd.read_csv(RESULTS_DIR / 'storage-tank' / f'{basin}_test_set.csv')
     basin_metrics = evaluate_meta(meta, basin, EVAL_CONFIG['storage_tank'])
     return basin_metrics
 
-def evaluate_well_pads(basin):
+def evaluate_well_pad_basin(basin):
     basin_metrics = defaultdict(list)
     meta_paths = (RESULTS_DIR / "well-pad" / basin).glob("*.csv")
     for meta_path in meta_paths:
@@ -63,60 +64,62 @@ def evaluate_well_pads(basin):
             basin_metrics[k].append(v)
     return basin_metrics
 
-def evaluate_all():    
-    print("*"*80) 
-    print("Well Pad Detection Pipeline -- Test set results (Table 1)")
-    permian_wp = evaluate_well_pads('permian')
-    denver_wp = evaluate_well_pads('denver')
-    print('Permian:')
-    for metric in METRICS:
-        metric_vals = permian_wp[metric]
-        print(f"{metric}: {np.mean(metric_vals)} ± {np.std(metric_vals)}")
-    print()
-    print('Denver:')
-    for metric in METRICS:
-        metric_vals = denver_wp[metric]
-        print(f"{metric}: {np.mean(metric_vals)} ± {np.std(metric_vals)}")
-    print()
-    print("Overall:")
-    for metric in METRICS:
-        permian_metric_vals = permian_wp[metric]
-        denver_metric_vals = denver_wp[metric]
-        overall_metric_mean = (
-            np.mean(permian_metric_vals) * (N_TEST_WP['permian'] / (N_TEST_WP['permian'] + N_TEST_WP['denver'])) + 
-            np.mean(denver_metric_vals) * (N_TEST_WP['denver'] / (N_TEST_WP['permian'] + N_TEST_WP['denver']))
-        )
-        overall_metric_std = (
-            np.std(permian_metric_vals) * (N_TEST_WP['permian'] / (N_TEST_WP['permian'] + N_TEST_WP['denver'])) + 
-            np.std(denver_metric_vals) * (N_TEST_WP['denver'] / (N_TEST_WP['permian'] + N_TEST_WP['denver']))
-        )
-        print(f"{metric}: {overall_metric_mean} ± {overall_metric_std}")
-    print("""
-    Note: Metrics displayed here are generated from 10 stochastic 
-    runs separate from those used in the paper and closely (but not exactly)
-    match the paper results.\n
-    """)
-    print("*"*80) 
-    print("Storage Tank Detection -- Test set results (Table 4)")
-    permian_st = evaluate_storage_tanks('permian')
-    denver_st = evaluate_storage_tanks('denver')
-    print("Permian:")
-    for metric in METRICS:
-        print(f"{metric}: {permian_st[metric]}")
-    print()
-    print("Denver")
-    for metric in METRICS:
-        print(f"{metric}: {denver_st[metric]}")
-    print()
-    print("Overall:")
-    for metric in METRICS:
-        permian_metric_val = permian_st[metric]
-        denver_metric_val = denver_st[metric]
-        overall_metric_val = (
-            permian_metric_val * (N_TEST_ST['permian'] / (N_TEST_ST['permian'] + N_TEST_ST['denver'])) +
-            denver_metric_val * (N_TEST_ST['denver'] / (N_TEST_ST['permian'] + N_TEST_ST['denver']))
-        )
-        print(f"{metric}: {overall_metric_val}")
-    print("*"*80) 
+def evaluate_well_pads():
+    n_permian, n_denver = N_TEST_WP['permian'], N_TEST_WP['denver']
+    n_total = n_permian + n_denver
+    means, stds = [], []
+    for basin in ['permian', 'denver']:
+        trial_metrics = evaluate_well_pad_basin(basin)
+        means.append([np.mean(trial_metrics[metric]) for metric in METRICS])
+        stds.append([np.std(trial_metrics[metric]) for metric in METRICS])
     
-evaluate_all()
+    means = np.array(means)
+    stds = np.array(stds)
+    overall_means = np.average(
+        means, axis=0, weights=[n_permian/n_total, n_denver/n_total]
+    )
+    overall_stds = np.average(
+        stds, axis=0, weights=[n_permian/n_total, n_denver/n_total]
+    )
+    mean_df = pd.DataFrame(
+        np.vstack([means, overall_means])
+    ).round(3).astype(str)
+    std_df = pd.DataFrame(
+        np.vstack([stds, overall_stds])
+    ).round(3).astype(str)
+    df = pd.DataFrame(mean_df + " ± " + std_df)
+    df.columns = METRICS
+    df.index = ['Permian', 'Denver', 'Overall']
+    with open('results/table1.txt', 'w') as f:
+        f.write(
+            tabulate(df, headers='keys', tablefmt='fancy_grid')
+        )
+
+def evaluate_storage_tanks():
+    n_permian, n_denver = N_TEST_ST['permian'], N_TEST_ST['denver']
+    n_total = n_permian + n_denver
+    metrics = []
+    for basin in ['permian', 'denver']:
+        basin_metrics = evaluate_storage_tank_basin(basin)
+        metrics.append([basin_metrics[metric] for metric in METRICS])
+        
+    metrics = np.array(metrics)    
+    overall_metrics = np.average(
+        metrics, axis=0, weights=[n_permian/n_total, n_denver/n_total]
+    )
+    df = pd.DataFrame(
+        np.vstack([metrics, overall_metrics]),
+        columns=METRICS,
+        index=['Permian', 'Denver', 'Overall']
+    ).round(3)
+    with open('results/table4.txt', 'w') as f:
+        f.write(
+            tabulate(df, headers='keys', tablefmt='fancy_grid')
+        )
+    
+def eval_test():
+    print("Evaluating well pad test set...")
+    evaluate_well_pads()
+    print("Evaluating storage tank test set...")
+    evaluate_storage_tanks()
+    print("Results saved to [results] directory.")
